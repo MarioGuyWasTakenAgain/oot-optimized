@@ -1037,37 +1037,28 @@ void CollisionCheck_InitContext(PlayState* play, CollisionCheckContext* colChkCt
 }
 
 void CollisionCheck_DestroyContext(PlayState* play, CollisionCheckContext* colChkCtx) {
+    return;
 }
 
 /**
  * Clears all collider lists in CollisionCheckContext when not in SAC mode.
  */
 void CollisionCheck_ClearContext(PlayState* play, CollisionCheckContext* colChkCtx) {
-    Collider** col;
-    OcLine** line;
-
     if (!(colChkCtx->sacFlags & SAC_ENABLE)) {
+        memset(colChkCtx->colAT, 0, sizeof(Collider*) * COLLISION_CHECK_AT_MAX);
         colChkCtx->colATCount = 0;
+
+        memset(colChkCtx->colAC, 0, sizeof(Collider*) * COLLISION_CHECK_AC_MAX);
         colChkCtx->colACCount = 0;
+
+        memset(colChkCtx->colOC, 0, sizeof(Collider*) * COLLISION_CHECK_OC_MAX);
         colChkCtx->colOCCount = 0;
+
+        memset(colChkCtx->colLine, 0, sizeof(OcLine*) * COLLISION_CHECK_OC_LINE_MAX);
         colChkCtx->colLineCount = 0;
-        for (col = colChkCtx->colAT; col < colChkCtx->colAT + COLLISION_CHECK_AT_MAX; col++) {
-            *col = NULL;
-        }
-
-        for (col = colChkCtx->colAC; col < colChkCtx->colAC + COLLISION_CHECK_AC_MAX; col++) {
-            *col = NULL;
-        }
-
-        for (col = colChkCtx->colOC; col < colChkCtx->colOC + COLLISION_CHECK_OC_MAX; col++) {
-            *col = NULL;
-        }
-
-        for (line = colChkCtx->colLine; line < colChkCtx->colLine + COLLISION_CHECK_OC_LINE_MAX; line++) {
-            *line = NULL;
-        }
     }
 }
+
 
 /**
  * Enables SAC, an alternate collision check mode that allows direct management of collider lists. Unused.
@@ -1422,6 +1413,7 @@ s32 CollisionCheck_NoSharedFlags(ColliderInfo* atInfo, ColliderInfo* acInfo) {
  * Used by collider types HIT1, HIT3, HIT5, METAL, NONE, WOOD, HARD, and TREE
  */
 void CollisionCheck_NoBlood(PlayState* play, Collider* collider, Vec3f* v) {
+    return;
 }
 
 /**
@@ -1603,22 +1595,32 @@ void CollisionCheck_HitSolid(PlayState* play, ColliderInfo* info, Collider* coll
  */
 s32 CollisionCheck_SwordHitAudio(Collider* at, ColliderInfo* acInfo) {
     if (at->actor != NULL && at->actor->category == ACTORCAT_PLAYER) {
-        if (acInfo->elemType == ELEMTYPE_UNK0) {
-            Audio_PlaySfxGeneral(NA_SE_IT_SWORD_STRIKE, &at->actor->projectedPos, 4, &gSfxDefaultFreqAndVolScale,
-                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
-        } else if (acInfo->elemType == ELEMTYPE_UNK1) {
-            Audio_PlaySfxGeneral(NA_SE_IT_SWORD_STRIKE_HARD, &at->actor->projectedPos, 4, &gSfxDefaultFreqAndVolScale,
-                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
-        } else if (acInfo->elemType == ELEMTYPE_UNK2) {
-            Audio_PlaySfxGeneral(NA_SE_NONE, &at->actor->projectedPos, 4, &gSfxDefaultFreqAndVolScale,
-                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
-        } else if (acInfo->elemType == ELEMTYPE_UNK3) {
-            Audio_PlaySfxGeneral(NA_SE_NONE, &at->actor->projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+        u32 soundId = NA_SE_NONE;
+
+        switch (acInfo->elemType) {
+            case ELEMTYPE_UNK0:
+                soundId = NA_SE_IT_SWORD_STRIKE;
+                break;
+            case ELEMTYPE_UNK1:
+                soundId = NA_SE_IT_SWORD_STRIKE_HARD;
+                break;
+            case ELEMTYPE_UNK2:
+            case ELEMTYPE_UNK3:
+                soundId = NA_SE_NONE;
+                break;
+            default:
+                break;
+        }
+
+        if (soundId != NA_SE_NONE) {
+            Audio_PlaySfxGeneral(soundId, &at->actor->projectedPos, 4, &gSfxDefaultFreqAndVolScale,
                                  &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
     }
+
     return true;
 }
+
 
 static ColChkBloodFunc sBloodFuncs[] = {
     CollisionCheck_NoBlood,    CollisionCheck_BlueBlood, CollisionCheck_GreenBlood,
@@ -1636,10 +1638,7 @@ static HitInfo sHitInfo[] = {
  */
 void CollisionCheck_HitEffects(PlayState* play, Collider* at, ColliderInfo* atInfo, Collider* ac, ColliderInfo* acInfo,
                                Vec3f* hitPos) {
-    if (acInfo->bumperFlags & BUMP_NO_HITMARK) {
-        return;
-    }
-    if (!(atInfo->toucherFlags & TOUCH_AT_HITMARK) && atInfo->toucherFlags & TOUCH_DREW_HITMARK) {
+    if (acInfo->bumperFlags & BUMP_NO_HITMARK || !(atInfo->toucherFlags & TOUCH_AT_HITMARK) && atInfo->toucherFlags & TOUCH_DREW_HITMARK) {
         return;
     }
     if (ac->actor != NULL) {
@@ -1739,10 +1738,8 @@ void CollisionCheck_AC_JntSphVsJntSph(PlayState* play, CollisionCheckContext* co
                 continue;
             }
             for (acElem = ac->elements; acElem < ac->elements + ac->count; acElem++) {
-                if (CollisionCheck_SkipBump(&acElem->info) == true) {
-                    continue;
-                }
-                if (CollisionCheck_NoSharedFlags(&atItem->info, &acElem->info) == true) {
+                if (CollisionCheck_SkipBump(&acElem->info) == true || 
+                    CollisionCheck_NoSharedFlags(&atItem->info, &acElem->info) == true) {
                     continue;
                 }
                 if (Math3D_SphVsSphOverlapCenter(&atItem->dim.worldSphere, &acElem->dim.worldSphere, &overlapSize,
@@ -1793,10 +1790,8 @@ void CollisionCheck_AC_JntSphVsCyl(PlayState* play, CollisionCheckContext* colCh
             return;
         }
         for (atItem = at->elements; atItem < at->elements + at->count; atItem++) {
-            if (CollisionCheck_SkipTouch(&atItem->info) == true) {
-                continue;
-            }
-            if (CollisionCheck_NoSharedFlags(&atItem->info, &ac->info) == true) {
+            if (CollisionCheck_SkipTouch(&atItem->info) == true || 
+                CollisionCheck_NoSharedFlags(&atItem->info, &ac->info) == true) {
                 continue;
             }
             if (Math3D_SphVsCylOverlapCenterDist(&atItem->dim.worldSphere, &ac->dim, &overlapSize, &centerDist)) {
@@ -1846,10 +1841,7 @@ void CollisionCheck_AC_CylVsJntSph(PlayState* play, CollisionCheckContext* colCh
             return;
         }
         for (acElem = ac->elements; acElem < ac->elements + ac->count; acElem++) {
-            if (CollisionCheck_SkipBump(&acElem->info) == true) {
-                continue;
-            }
-            if (CollisionCheck_NoSharedFlags(&at->info, &acElem->info) == true) {
+            if (CollisionCheck_SkipBump(&acElem->info) == true || CollisionCheck_NoSharedFlags(&at->info, &acElem->info) == true) {
                 continue;
             }
             if (Math3D_SphVsCylOverlapCenterDist(&acElem->dim.worldSphere, &at->dim, &overlapSize, &centerDist)) {
@@ -1902,10 +1894,7 @@ void CollisionCheck_AC_JntSphVsTris(PlayState* play, CollisionCheckContext* colC
                 continue;
             }
             for (acTri = ac->elements; acTri < ac->elements + ac->count; acTri++) {
-                if (CollisionCheck_SkipBump(&acTri->info) == true) {
-                    continue;
-                }
-                if (CollisionCheck_NoSharedFlags(&atSph->info, &acTri->info) == true) {
+                if (CollisionCheck_SkipBump(&acTri->info) == true || CollisionCheck_NoSharedFlags(&atSph->info, &acTri->info) == true) {
                     continue;
                 }
                 if (Math3D_TriVsSphIntersect(&atSph->dim.worldSphere, &acTri->dim, &hitPos) == true) {
@@ -1944,10 +1933,7 @@ void CollisionCheck_AC_TrisVsJntSph(PlayState* play, CollisionCheckContext* colC
                 continue;
             }
             for (atItem = at->elements; atItem < at->elements + at->count; atItem++) {
-                if (CollisionCheck_SkipTouch(&atItem->info) == true) {
-                    continue;
-                }
-                if (CollisionCheck_NoSharedFlags(&atItem->info, &acElem->info) == true) {
+                if (CollisionCheck_SkipTouch(&atItem->info) || CollisionCheck_NoSharedFlags(&atItem->info, &acElem->info) == true) {
                     continue;
                 }
                 if (Math3D_TriVsSphIntersect(&acElem->dim.worldSphere, &atItem->dim, &hitPos) == true) {
@@ -1988,10 +1974,7 @@ void CollisionCheck_AC_JntSphVsQuad(PlayState* play, CollisionCheckContext* colC
         Math3D_TriNorm(&tri1, &ac->dim.quad[2], &ac->dim.quad[3], &ac->dim.quad[1]);
         Math3D_TriNorm(&tri2, &ac->dim.quad[1], &ac->dim.quad[0], &ac->dim.quad[2]);
         for (atItem = at->elements; atItem < at->elements + at->count; atItem++) {
-            if (CollisionCheck_SkipTouch(&atItem->info) == true) {
-                continue;
-            }
-            if (CollisionCheck_NoSharedFlags(&atItem->info, &ac->info) == true) {
+            if (CollisionCheck_SkipTouch(&atItem->info) || CollisionCheck_NoSharedFlags(&atItem->info, &ac->info) == true) {
                 continue;
             }
             if (Math3D_TriVsSphIntersect(&atItem->dim.worldSphere, &tri1, &hitPos) == true ||
@@ -2037,7 +2020,7 @@ void CollisionCheck_AC_QuadVsJntSph(PlayState* play, CollisionCheckContext* colC
             if (CollisionCheck_NoSharedFlags(&at->info, &acElem->info) == true) {
                 continue;
             }
-            if (Math3D_TriVsSphIntersect(&acElem->dim.worldSphere, &tri1, &hitPos) == true ||
+            if (Math3D_TriVsSphIntersect(&acElem->dim.worldSphere, &tri1, &hitPos) ||
                 Math3D_TriVsSphIntersect(&acElem->dim.worldSphere, &tri2, &hitPos) == true) {
                 if (Collider_QuadSetNearestAC(play, at, &hitPos)) {
                     Vec3f atPos;
@@ -2075,13 +2058,9 @@ void CollisionCheck_AC_CylVsCyl(PlayState* play, CollisionCheckContext* colChkCt
     Vec3f hitPos;
 
     if (at->dim.radius > 0 && at->dim.height > 0 && ac->dim.radius > 0 && ac->dim.height > 0) {
-        if (CollisionCheck_SkipBump(&ac->info) == true) {
-            return;
-        }
-        if (CollisionCheck_SkipTouch(&at->info) == true) {
-            return;
-        }
-        if (CollisionCheck_NoSharedFlags(&at->info, &ac->info) == true) {
+        if (CollisionCheck_SkipBump(&ac->info) || 
+            CollisionCheck_SkipTouch(&at->info) || 
+            CollisionCheck_NoSharedFlags(&at->info, &ac->info)) {
             return;
         }
         if (Math3D_CylOutsideCylDist(&at->dim, &ac->dim, &deadSpace, &centerDistXZ) == true) {
@@ -2118,10 +2097,7 @@ void CollisionCheck_AC_CylVsTris(PlayState* play, CollisionCheckContext* colChkC
             return;
         }
         for (acElem = ac->elements; acElem < ac->elements + ac->count; acElem++) {
-            if (CollisionCheck_SkipBump(&acElem->info) == true) {
-                continue;
-            }
-            if (CollisionCheck_NoSharedFlags(&at->info, &acElem->info) == true) {
+            if (CollisionCheck_SkipBump(&acElem->info) || CollisionCheck_NoSharedFlags(&at->info, &acElem->info)) {
                 continue;
             }
             if (Math3D_CylTriVsIntersect(&at->dim, &acElem->dim, &hitPos) == true) {
@@ -2156,10 +2132,7 @@ void CollisionCheck_AC_TrisVsCyl(PlayState* play, CollisionCheckContext* colChkC
             return;
         }
         for (atItem = at->elements; atItem < at->elements + at->count; atItem++) {
-            if (CollisionCheck_SkipTouch(&atItem->info) == true) {
-                continue;
-            }
-            if (CollisionCheck_NoSharedFlags(&atItem->info, &ac->info) == true) {
+            if (CollisionCheck_SkipTouch(&atItem->info) || CollisionCheck_NoSharedFlags(&atItem->info, &ac->info)) {
                 continue;
             }
 
@@ -2186,10 +2159,9 @@ void CollisionCheck_AC_CylVsQuad(PlayState* play, CollisionCheckContext* colChkC
     ColliderQuad* ac = (ColliderQuad*)colAC;
 
     if (at->dim.height > 0 && at->dim.radius > 0) {
-        if (CollisionCheck_SkipTouch(&at->info) == true || CollisionCheck_SkipBump(&ac->info) == true) {
-            return;
-        }
-        if (CollisionCheck_NoSharedFlags(&at->info, &ac->info) == true) {
+        if (CollisionCheck_SkipTouch(&at->info) || 
+            CollisionCheck_SkipBump(&ac->info) || 
+            CollisionCheck_NoSharedFlags(&at->info, &ac->info)) {
             return;
         }
         Math3D_TriNorm(&tri1, &ac->dim.quad[2], &ac->dim.quad[3], &ac->dim.quad[1]);
@@ -2230,10 +2202,7 @@ void CollisionCheck_AC_QuadVsCyl(PlayState* play, CollisionCheckContext* colChkC
     ColliderCylinder* ac = (ColliderCylinder*)colAC;
 
     if (ac->dim.height > 0 && ac->dim.radius > 0) {
-        if (CollisionCheck_SkipBump(&ac->info) == true || CollisionCheck_SkipTouch(&at->info) == true) {
-            return;
-        }
-        if (CollisionCheck_NoSharedFlags(&at->info, &ac->info) == true) {
+        if (CollisionCheck_SkipBump(&ac->info) || CollisionCheck_SkipTouch(&at->info) || CollisionCheck_NoSharedFlags(&at->info, &ac->info)) {
             return;
         }
         Math3D_TriNorm(&tri1, &at->dim.quad[2], &at->dim.quad[3], &at->dim.quad[1]);
@@ -2419,13 +2388,7 @@ void CollisionCheck_AC_QuadVsQuad(PlayState* play, CollisionCheckContext* colChk
     s32 i;
     s32 j;
 
-    if (CollisionCheck_SkipTouch(&at->info) == true) {
-        return;
-    }
-    if (CollisionCheck_SkipBump(&ac->info) == true) {
-        return;
-    }
-    if (CollisionCheck_NoSharedFlags(&at->info, &ac->info) == true) {
+    if (CollisionCheck_SkipTouch(&at->info) || CollisionCheck_SkipBump(&ac->info) || CollisionCheck_NoSharedFlags(&at->info, &ac->info)) {
         return;
     }
 
@@ -2663,7 +2626,7 @@ void CollisionCheck_SetOCvsOC(Collider* left, ColliderInfo* leftInfo, Vec3f* lef
     if (left->ocFlags2 & OC2_TYPE_PLAYER) {
         right->ocFlags2 |= OC2_HIT_PLAYER;
     }
-    if (leftActor == NULL || rightActor == NULL || left->ocFlags1 & OC1_NO_PUSH || right->ocFlags1 & OC1_NO_PUSH) {
+    if (leftActor || rightActor = NULL || left->ocFlags1 || right->ocFlags1 & OC1_NO_PUSH) {
         return;
     }
     leftMassType = CollisionCheck_GetMassType(leftActor->colChkInfo.mass);
